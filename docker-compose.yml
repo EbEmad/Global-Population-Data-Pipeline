@@ -57,6 +57,42 @@ services:
       POSTGRES_DB: test
     ports:
       - "5433:5432"
+    command:
+      - "postgres"
+      # WAL & Replication
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_wal_senders=10"
+      - "-c"
+      - "max_replication_slots=10"
+       # Connection Settings
+      - "-c"
+      - "max_connections=200"
+      - "-c"
+      - "shared_buffers=512MB"
+      - "-c"
+      - "log_min_duration_statement=1000"
+      # Memory Settings (Optimized for 2GB allocation)
+      - "-c"
+      - "shared_buffers=512MB" # Increased from 256MB (25% of RAM)
+      - "-c"
+      - "effective_cache_size=1536MB" # Increased from 1GB (75% of RAM)
+      - "-c"
+      - "work_mem=8MB" # Decreased from 16MB (avoid OOM)
+      - "-c"
+      - "maintenance_work_mem=128MB" # For VACUUM, CREATE INDEX
+      - "-c"
+      - "temp_buffers=16MB" # For temporary tables
+      # Query Planning
+      - "-c"
+      - "random_page_cost=1.1" # SSD optimization (default: 4.0)
+      - "-c"
+      - "effective_io_concurrency=200" # SSD optimization (default: 1)
+      - "-c"
+      - "default_statistics_target=100" # Better query plans
+
+
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 10s
