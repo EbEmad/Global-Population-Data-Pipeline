@@ -91,7 +91,51 @@ services:
       - "effective_io_concurrency=200" # SSD optimization (default: 1)
       - "-c"
       - "default_statistics_target=100" # Better query plans
+       # Write Performance
+      - "-c"
+      - "wal_buffers=16MB" # WAL buffer size
+      - "-c"
+      - "checkpoint_completion_target=0.9" # Spread checkpoints
+      - "-c"
+      - "max_wal_size=1GB" # Increased from 1GB
+      - "-c"
+      - "min_wal_size=256MB"
+      # Parallel Query
+      - "-c"
+      - "max_worker_processes=4" # Use 4 CPU cores
+      - "-c"
+      - "max_parallel_workers_per_gather=2" # Parallel queries
+      - "-c"
+      - "max_parallel_workers=4"
+      - "-c"
+      - "max_parallel_maintenance_workers=2" # Parallel CREATE INDEX
+      # Logging (for debugging)
+      - "-c"
+      - "log_min_duration_statement=1000" # Log queries > 1 second
+      - "-c"
+      - "log_line_prefix=%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h "
+      - "-c"
+      - "log_checkpoints=on"
+      - "-c"
+      - "log_connections=on"
+      - "-c"
+      - "log_disconnections=on"
+      - "-c"
+      - "log_lock_waits=on" # Log lock waits
 
+      # Autovacuum (Prevent bloat)
+      - "-c"
+      - "autovacuum=on"
+      - "-c"
+      - "autovacuum_max_workers=3"
+      - "-c"
+      - "autovacuum_naptime=10s" # Check every 10 seconds
+
+      # Extensions
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
+      - "-c"
+      - "pg_stat_statements.track=all"
 
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
