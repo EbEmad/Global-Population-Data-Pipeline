@@ -16,6 +16,60 @@ An automated ETL pipeline that extracts global population data from [Worldometer
 ![Pipeline Flow](images/pipeline.png)
 ![Time Flow](images/time_spent_flow.png)
 
+## Deltailed Architecture
+
+```mermaid
+graph TB
+    subgraph "Data Sources Layer"
+        Worldometers["🌐 Worldometers<br/>population-by-country<br/>(HTML Table)"]
+    end
+
+    subgraph "Orchestration Layer"
+        Airflow[" Apache Airflow<br/>DAG: population_data_pipeline<br/>Scheduler + Webserver + Workers<br/>Port 8080"]
+    end
+
+    subgraph "ETL / Processing Layer"
+        Scraper["🐍 Web Scraper Task<br/>(BeautifulSoup + requests)"]
+        Transformer[" Transform / Clean Task<br/>(Pandas / Python)"]
+        LoaderPG["📥 PostgreSQL Loader"]
+        LoaderS3["📤 S3 Uploader<br/>(Raw or Parquet)"]
+        KafkaProducer["📤 Kafka Producer<br/>(Optional – batch → events)"]
+    end
+
+    subgraph "Event Backbone / Streaming Layer"
+        Kafka["📨 Apache Kafka<br/>Port 9092<br/>Topic: population_updates"]
+    end
+
+    subgraph "Data Persistence Layer"
+        Postgres[("🐘 PostgreSQL<br/>population_db<br/>Port 5432")]
+        S3[("☁️ AWS S3<br/>Bucket: raw / processed / bronze<br/>Data Lake")]
+    end
+
+    subgraph "Monitoring Layer"
+        Grafana["📈 Grafana<br/>Port 3000<br/>Dashboards + Metrics"]
+    end
+
+    Airflow -->|"Triggers & Schedules"| Scraper
+    Airflow -->|"Triggers & Schedules"| Transformer
+    Airflow -->|"Triggers & Schedules"| LoaderPG
+    Airflow -->|"Triggers & Schedules"| LoaderS3
+
+    Worldometers -->|"HTTP GET + Parse table<br/>(Country • Population 2025 • Yearly Change • ...)"| Scraper
+    Scraper -->|"Raw structured rows"| Transformer
+    Transformer -->|"Cleaned & typed records"| LoaderPG
+    Transformer -->|"Parquet / CSV files"| LoaderS3
+    LoaderPG -->|"SQL INSERT / UPSERT"| Postgres
+    LoaderS3 -->|"PUT object"| S3
+
+    Postgres -.->|"CDC (optional Debezium)"| Kafka
+    Transformer -.->|"Publish delta (optional)"| KafkaProducer
+    KafkaProducer -.-> Kafka
+
+    Airflow -->|"Logs & Metrics"| Grafana
+    Kafka -->|"Consumer lag & metrics"| Grafana
+    Postgres -->|"Query stats"| Grafana
+```
+
 ## Key Features
 
 - **Web Scraping**: Automated data extraction using BeautifulSoup
@@ -33,7 +87,6 @@ An automated ETL pipeline that extracts global population data from [Worldometer
 | **Database** | PostgreSQL |
 | **Streaming** | Apache Kafka |
 | **Cloud Storage** | AWS S3 |
-| **Data Warehouse** | Google BigQuery |
 | **IaC** | Terraform |
 | **Containers** | Docker & Docker Compose |
 | **Monitoring** | Grafana |
