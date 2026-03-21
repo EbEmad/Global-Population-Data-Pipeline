@@ -1,57 +1,49 @@
-# AWS Configuration Variables
-variable "aws_region" {
-  description = "AWS region for resources"
-  type        = string
-  default     = "me-south-1" # Bahrain (closest to Egypt)
-}
-
-variable "aws_profile" {
-  description = "AWS profile to use (optional)"
-  type        = string
-  default     = "default"
-}
-
-variable "project_name" {
-  description = "Name of the project"
-  type        = string
-  default     = "world-population-etl"
+variable "project" {
+  description = "Project name used as a prefix for all resource names"
+  type=string
+  default = "etl-pipeline"
 }
 
 variable "environment" {
-  description = "Environment name (dev, staging, prod)"
-  type        = string
-  default     = "dev"
+  description = "Deployment environment (local, dev, staging, prod)"
+  type = string
+  default = "local"
 }
 
-# S3 Configuration
-variable "s3_bucket_name" {
-  description = "Name of the S3 bucket for data storage"
-  type        = string
-  default     = "world-population-etl-bucket"
+variable "aws_region" {
+  description = "AWS region for all resources"
+  type = string
+  default = "us-east-1"
+}
+variable "aws_access_key" {
+  description = "AWS access key (use 'test' for LocalStack)"
+  type = string
+  default = "test"
+  sensitive = true
 }
 
-variable "s3_storage_class" {
-  description = "Storage class for S3 bucket"
-  type        = string
-  default     = "STANDARD"
+variable "aws_secret_key" {
+  description = "AWS secret key (use 'test' for LocalStack)"
+  type = string
+  default = "test"
+  sensitive = true
 }
 
-# Glue Configuration
-variable "glue_database_name" {
-  description = "Name of the Glue database"
-  type        = string
-  default     = "world_population_db"
+variable "aws_account_id" {
+  description = "AWS account ID (LocalStack default is 000000000000)"
+  type = string
+  default = "000000000000"
+  
 }
 
-variable "glue_catalog_table_name" {
-  description = "Name of the Glue catalog table"
+variable "localstack_endpoint" {
+  description = "LocalStack gateway URL. Set to empty string when deploying to real AWS."
   type        = string
-  default     = "population_data"
+  default     = "http://localhost:4566"
 }
 
-# IAM Configuration
-variable "create_iam_roles" {
-  description = "Whether to create IAM roles for Glue and other services"
+variable "enable_s3_versioning" {
+  description = "Enable versioning on S3 buckets"
   type        = bool
   default     = true
 }
