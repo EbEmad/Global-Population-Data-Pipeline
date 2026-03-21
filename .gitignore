@@ -207,3 +207,5 @@ marimo/_lsp/
 __marimo__/services/terraform/keys/my-creds.json
 services/terraform/keys/my-creds.json
 test
+.env.p
+summary
