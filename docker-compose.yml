@@ -1,4 +1,5 @@
 services:
+  # KAFKA ECOSYSTEM
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: docs-kafka
@@ -22,7 +23,7 @@ services:
       KAFKA_HEAP_OPTS: "-Xms512m -Xmx512m"
 
     networks:
-      - realtime
+      - docs-network
     healthcheck:
       test: [ "CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092" ]
       interval: 10s
@@ -37,27 +38,6 @@ services:
           cpus: '0.5'
           memory: 512M
 
-  init-kafka:
-    image: confluentinc/cp-kafka:7.5.0
-    container_name: init-kafka
-    depends_on:
-      kafka:
-        condition: service_healthy
-    entrypoint: ["/bin/bash", "-c"]
-    command: |
-      "
-      echo 'Waiting for Kafka to be ready...' &&
-      kafka-topics --bootstrap-server kafka:9092 --list &&
-
-      echo 'Creating topics...' &&
-      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic ETL-PROJECT --partitions 1 --replication-factor 1 --config retention.ms=604800000 &&
-      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic population-raw --partitions 3 --replication-factor 1 --config retention.ms=604800000 &&
-
-      echo 'Topics created successfully:'  &&
-      kafka-topics --bootstrap-server kafka:9092 --list
-      "
-    networks:
-      - realtime
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: docs-kafka-ui
@@ -69,13 +49,58 @@ services:
     depends_on:
       - kafka
     networks:
-      - realtime
+      - docs-network
     deploy:
       resources:
         limits:
           cpus: '0.25'
           memory: 256M
 
+  debezium:
+    build:
+      context: ./services/debezium
+      dockerfile: Dockerfile
+    container_name: docs-debezium
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: debezium_configs
+      OFFSET_STORAGE_TOPIC: debezium_offsets
+      STATUS_STORAGE_TOPIC: debezium_statuses
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx512m"
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./scripts/setup-debezium.sh:/scripts/setup-debezium.sh
+      - ./services/debezium/s3-sink-connector.json:/debezium/s3-sink-connector.json
+    entrypoint: [ "/scripts/setup-debezium.sh" ]
+    networks:
+      - docs-network
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8083/ || exit 1" ]
+      interval: 10s
+      timeout: 20s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 768M
+        reservations:
+          cpus: '0.25'
+          memory: 512M
 
   db:
     image: postgres:13
@@ -93,8 +118,7 @@ services:
       - "-c"
       - "max_wal_senders=10"
       - "-c"
-      - "max_replication_slots=10"
-       # Connection Settings
+      - "max_replication_slots=10" # Connection Settings
       - "-c"
       - "max_connections=200"
       - "-c"
@@ -118,8 +142,9 @@ services:
       - "-c"
       - "effective_io_concurrency=200" # SSD optimization (default: 1)
       - "-c"
-      - "default_statistics_target=100" # Better query plans
-       # Write Performance
+      - "default_statistics_target=100"
+        # Better query plans
+        # Write Performance
       - "-c"
       - "wal_buffers=16MB" # WAL buffer size
       - "-c"
@@ -166,7 +191,7 @@ services:
       - "pg_stat_statements.track=all"
 
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "airflow"]
+      test: [ "CMD", "pg_isready", "-U", "airflow" ]
       interval: 10s
       retries: 5
       start_period: 5s
@@ -229,7 +254,6 @@ services:
     command: scheduler
     networks:
       - realtime
-  
 
 networks:
   realtime:
